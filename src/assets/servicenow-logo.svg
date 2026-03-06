@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 32" height="32" role="img" aria-label="ServiceNow">
+  <!--
+    PLACEHOLDER — replace with the official ServiceNow logo SVG from the ServiceNow brand assets page.
+    This placeholder uses the brand colors (#293e40 navy, #62d84e green) for development purposes only.
+  -->
+  <rect width="180" height="32" fill="none"/>
+  <!-- Green checkmark accent -->
+  <circle cx="16" cy="16" r="12" fill="#62d84e"/>
+  <polyline points="10,16 14,21 22,11" fill="none" stroke="#293e40" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Wordmark -->
+  <text x="34" y="21" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="700" fill="#ffffff" letter-spacing="-0.2">ServiceNow</text>
+</svg>

@@ -1,0 +1,78 @@
+# Node.js / JavaScript / TypeScript
+node_modules/
+dist/
+build/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+.npm
+.eslintcache
+.yarn-integrity
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Rust
+target/
+debug/
+release/
+**/*.rs.bk
+*.rlib
+*.prof
+*.profraw
+Cargo.lock
+
+# Tauri build outputs
+src-tauri/target/
+src-tauri/Cargo.lock
+
+# SQLite databases
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Build artifacts
+*.tgz
+*.zip
+*.tar.gz
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Logs
+logs/
+*.log
+
+# Vite cache
+.vite/
+
+# Large docs (PDFs)
+docs/*.pdf

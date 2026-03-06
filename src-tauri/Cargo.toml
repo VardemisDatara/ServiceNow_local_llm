@@ -1,0 +1,58 @@
+[package]
+name = "servicenow-mcp-bridge"
+version = "0.1.0"
+description = "ServiceNow MCP Bridge - Desktop application for bidirectional AI communication"
+authors = []
+license = "MIT"
+repository = ""
+edition = "2021"
+rust-version = "1.75.0"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.5.4", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.10.0", features = [] }
+tauri-plugin-log = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-sql = { version = "2", features = ["sqlite"] }
+
+# Credentials storage
+keyring = "2.3"
+
+# HTTP client
+reqwest = { version = "0.11", features = ["json", "stream"] }
+futures-util = "0.3"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Encoding
+base64 = "0.22"
+
+# PKCE for OAuth Authorization Code flow
+sha2 = "0.10"
+rand = "0.8"
+
+# Date/time formatting
+chrono = "0.4"
