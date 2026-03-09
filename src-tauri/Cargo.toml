@@ -1,6 +1,6 @@
 [package]
 name = "servicenow-mcp-bridge"
-version = "0.1.0"
+version = "1.0.0"
 description = "ServiceNow MCP Bridge - Desktop application for bidirectional AI communication"
 authors = []
 license = "MIT"
