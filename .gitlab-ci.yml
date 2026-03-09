@@ -1,5 +1,15 @@
 include:
-  - template: Jobs/Code-Quality.gitlab-ci.yml
   - template: Jobs/SAST.gitlab-ci.yml
   - template: Jobs/Secret-Detection.gitlab-ci.yml
   - template: Jobs/Dependency-Scanning.gitlab-ci.yml
+
+stages:
+  - test
+
+code_quality:
+  stage: test
+  image: node:20-alpine
+  script:
+    - npm ci --prefer-offline
+    - npm run lint
+  allow_failure: true
