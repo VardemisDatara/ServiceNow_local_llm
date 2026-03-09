@@ -192,7 +192,7 @@ class ContextLogger {
  * File handler for persistent logging
  * Logs to a rotating file in the user's data directory
  */
-export function createFileHandler(filePath: string): LogHandler {
+export function createFileHandler(_filePath: string): LogHandler {
   const logs: LogEntry[] = [];
   const MAX_LOGS = 1000;
 

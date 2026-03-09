@@ -3,7 +3,7 @@
  * Covers T004 (US1) and T010 (US2).
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ConnectionStatusPanel } from '../../../src/renderer/components/StatusIndicator';
 import type { ConnectionStatus } from '../../../src/models/Configuration';

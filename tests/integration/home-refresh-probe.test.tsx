@@ -6,7 +6,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock reconnect so we can track calls without real network
-const mockReconnect = vi.fn().mockResolvedValue(undefined);
+const _mockReconnect = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('../../src/core/services/connection-test', () => ({
   testOllamaConnection: vi.fn().mockResolvedValue({ success: true, latencyMs: 10, message: 'ok' }),

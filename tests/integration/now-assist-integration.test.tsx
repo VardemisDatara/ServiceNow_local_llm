@@ -65,7 +65,6 @@ vi.mock('../../src/utils/logger', () => ({
 // NowAssistConfig will be exported from Configuration.tsx after T019.
 // Until then, the destructured import gives undefined → tests fail with
 // "NowAssistConfig is not a function" (TDD expected failure).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const { NowAssistConfig } = await import('../../src/renderer/components/Configuration').catch(
   () => ({ NowAssistConfig: undefined }),
 ) as { NowAssistConfig: React.FC<{

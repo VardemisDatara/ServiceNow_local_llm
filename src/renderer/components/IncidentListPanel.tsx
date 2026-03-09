@@ -56,7 +56,7 @@ export interface FetchIncidentsResult {
 }
 
 // ─── fetchIncidents helper (exported for integration tests) ───────────────────
-
+// eslint-disable-next-line react-refresh/only-export-components
 export async function fetchIncidents(params: FetchIncidentsParams): Promise<FetchIncidentsResult> {
   const PAGE_SIZE = 50;
   try {

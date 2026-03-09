@@ -312,7 +312,7 @@ export function SecurityWorkflow({
               fontSize: '0.875rem',
             }}
           >
-            Select an incident from the list to view its analysis, or click "Analyze" to run a new
+            Select an incident from the list to view its analysis, or click &quot;Analyze&quot; to run a new
             workflow.
           </div>
         )}
@@ -376,7 +376,7 @@ async function generateWorkflowSummary(
   const actions: string[] = [];
   if (actionsMatch?.[1]) {
     for (const line of actionsMatch[1].split('\n')) {
-      const cleaned = line.replace(/^\s*\d+[\.\)]\s*/, '').trim();
+      const cleaned = line.replace(/^\s*\d+[.)]\s*/, '').trim();
       if (cleaned.length > 0) actions.push(cleaned);
     }
   }

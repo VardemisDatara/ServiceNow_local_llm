@@ -136,7 +136,7 @@ const initialState: AppState = {
 export const useAppStore = create<AppStore>()(
   devtools(
     persist(
-      (set, get) => ({
+      (set, _get) => ({
         ...initialState,
 
         // Configuration Actions

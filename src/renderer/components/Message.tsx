@@ -72,7 +72,7 @@ function WebSearchCard({ meta }: { meta: WebSearchMetadata }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>🔍 "{meta.query}"</span>
+        <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>🔍 &quot;{meta.query}&quot;</span>
         <span
           style={{
             fontSize: '0.65rem',

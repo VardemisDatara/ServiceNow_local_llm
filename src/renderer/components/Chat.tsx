@@ -57,7 +57,6 @@ export function Chat({ session, onSessionUpdate }: ChatProps) {
         }
       })
       .catch(() => null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProfile?.ollamaEndpoint]);
 
   // Auto-scroll to bottom
