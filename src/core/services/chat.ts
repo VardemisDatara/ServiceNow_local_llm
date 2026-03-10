@@ -159,7 +159,7 @@ export async function sendMessage(opts: SendMessageOptions): Promise<Conversatio
             sender: 'web_search',
             content: `Web search: "${query}"`,
             sequenceNumber: seq,
-            metadata: webSearchMeta as unknown,
+            metadata: webSearchMeta,
           });
           await aiSessionRepository.incrementMessageCount(sessionId);
         }
@@ -293,7 +293,7 @@ export async function sendMessage(opts: SendMessageOptions): Promise<Conversatio
       sender: aiSender,
       content: fullResponse,
       sequenceNumber: seq,
-      metadata: llmMeta as unknown,
+      metadata: llmMeta,
     });
     await aiSessionRepository.incrementMessageCount(sessionId);
   }
@@ -610,7 +610,7 @@ async function executeMCPToolCalls(
         sender: 'servicenow_now_assist',
         content: displayText,
         sequenceNumber: seq,
-        metadata: metadata as unknown, // stored as JSON
+        metadata: metadata,
       });
       await aiSessionRepository.incrementMessageCount(sessionId);
     }
