@@ -55,6 +55,7 @@ pub fn run() {
       commands::credentials::get_api_key,
       commands::credentials::delete_api_key,
       commands::credentials::has_api_key,
+      #[cfg(debug_assertions)]
       commands::credentials::test_credentials,
       commands::credentials::get_now_assist_oauth_token,
       commands::credentials::now_assist_oauth_login,
