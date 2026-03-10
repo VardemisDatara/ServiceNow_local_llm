@@ -1,26 +1,10 @@
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use crate::keychain::{self, ServiceNowCredentials};
 
 /// Fixed localhost port for the OAuth Authorization Code callback server.
 /// Must match the redirect_uri registered in the ServiceNow OAuth Application Registry:
 ///   http://localhost:7823/oauth
 const OAUTH_CALLBACK_PORT: u16 = 7823;
-
-/// Request payload for storing ServiceNow credentials
-#[derive(Debug, Deserialize)]
-pub struct StoreServiceNowCredentialsRequest {
-    pub profile_id: String,
-    pub username: String,
-    pub password: String,
-}
-
-/// Request payload for storing API keys
-#[derive(Debug, Deserialize)]
-pub struct StoreApiKeyRequest {
-    pub provider: String,
-    pub profile_id: String,
-    pub api_key: String,
-}
 
 /// Response for credential existence check
 #[derive(Debug, Serialize)]
@@ -296,12 +280,9 @@ pub async fn now_assist_oauth_login(
     let code_challenge = URL_SAFE_NO_PAD.encode(challenge_hash);
 
     // ── 3. Build the authorization URL ────────────────────────────────────────
-    let state = format!("{:x}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos()
-    );
+    let mut state_bytes = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut state_bytes);
+    let state = URL_SAFE_NO_PAD.encode(state_bytes);
 
     // Request `openid` scope so ServiceNow includes an `id_token` (JWT) in the
     // token exchange response.  The MCP endpoint requires a JWT Bearer token;
@@ -472,6 +453,7 @@ pub async fn now_assist_oauth_login(
 ///
 /// # Tauri Command
 /// Called from frontend: `invoke('test_credentials')`
+#[cfg(debug_assertions)]
 #[tauri::command]
 pub fn test_credentials() -> Result<String, String> {
     let test_profile = "test_profile_dev";
