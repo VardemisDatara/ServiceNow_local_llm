@@ -28,8 +28,11 @@ export function validateServiceNowUrl(url: string): ValidationResult {
     return { valid: false, error: 'Invalid URL format. Example: https://dev12345.service-now.com' };
   }
 
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-    return { valid: false, error: 'URL must use http or https protocol' };
+  if (parsed.protocol !== 'https:') {
+    return {
+      valid: false,
+      error: 'ServiceNow URL must use HTTPS (https://). HTTP is not accepted because credentials would be transmitted in cleartext.',
+    };
   }
 
   if (!parsed.hostname || parsed.hostname.length === 0) {
