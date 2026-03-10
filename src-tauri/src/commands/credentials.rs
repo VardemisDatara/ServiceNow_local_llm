@@ -1,5 +1,6 @@
 use serde::Serialize;
 use crate::keychain::{self, ServiceNowCredentials};
+use crate::integrations::{bitwarden, one_password};
 
 /// Fixed localhost port for the OAuth Authorization Code callback server.
 /// Must match the redirect_uri registered in the ServiceNow OAuth Application Registry:
@@ -19,103 +20,322 @@ pub struct ServiceNowCredentialsResponse {
     pub password: String,
 }
 
-/// Store ServiceNow credentials in OS keychain
+// ── Provider routing helpers ──────────────────────────────────────────────────
+
+/// Resolve the effective credential backend from the `provider_id` parameter.
+/// Empty string or `"keychain"` both map to the OS keychain (backward-compatible).
+fn resolve_provider(provider_id: &str) -> &str {
+    if provider_id.is_empty() {
+        "keychain"
+    } else {
+        provider_id
+    }
+}
+
+/// Build the PROVIDER_LOCKED error string for 1Password when the session has expired.
+async fn check_op_available() -> Result<(), String> {
+    if !one_password::is_installed().await {
+        return Err("PROVIDER_LOCKED: 1Password CLI (op) not installed".to_string());
+    }
+    if !one_password::is_authenticated().await {
+        return Err(
+            "PROVIDER_LOCKED: 1Password session expired — re-authenticate and retry".to_string(),
+        );
+    }
+    Ok(())
+}
+
+/// Build the PROVIDER_LOCKED error string for Bitwarden when the vault is locked.
+async fn check_bw_available(bw_session: &str) -> Result<(), String> {
+    if !bitwarden::is_installed().await {
+        return Err("PROVIDER_LOCKED: Bitwarden CLI (bw) not installed".to_string());
+    }
+    if bw_session.is_empty()
+        || bitwarden::get_session_status().await != bitwarden::BwStatus::Unlocked
+    {
+        return Err(
+            "PROVIDER_LOCKED: Bitwarden vault is locked — run bw unlock and retry".to_string(),
+        );
+    }
+    Ok(())
+}
+
+// ── ServiceNow credential commands ───────────────────────────────────────────
+
+/// Store ServiceNow credentials via the selected provider backend.
 ///
 /// # Tauri Command
-/// Called from frontend: `invoke('store_servicenow_credentials', { profileId, username, password })`
+/// Called from frontend: `invoke('store_servicenow_credentials', { profileId, username, password, providerId?, bwSession? })`
+///
+/// `provider_id`: `""` / `"keychain"` (default), `"1password"`, or `"bitwarden"`.
+/// `bw_session`: Bitwarden session token — required when `provider_id` is `"bitwarden"`.
 #[tauri::command]
-pub fn store_servicenow_credentials(
+pub async fn store_servicenow_credentials(
     profile_id: String,
     username: String,
     password: String,
+    provider_id: Option<String>,
+    bw_session: Option<String>,
 ) -> Result<(), String> {
-    let credentials = ServiceNowCredentials { username, password };
+    let provider = resolve_provider(provider_id.as_deref().unwrap_or(""));
+    let key = format!("servicenow_{}", profile_id);
+    let value = serde_json::json!({ "username": username, "password": password }).to_string();
 
-    keychain::store_servicenow_credentials(&profile_id, &credentials)
-        .map_err(|e| e.to_string())
+    match provider {
+        "1password" => {
+            check_op_available().await?;
+            one_password::write_secret(&key, &value).await
+        }
+        "bitwarden" => {
+            let session = bw_session.as_deref().unwrap_or("");
+            check_bw_available(session).await?;
+            bitwarden::write_secret(&key, &value, session)
+                .await
+                .map(|_uuid| ())
+        }
+        _ => {
+            let credentials = ServiceNowCredentials { username, password };
+            keychain::store_servicenow_credentials(&profile_id, &credentials)
+                .map_err(|e| e.to_string())
+        }
+    }
 }
 
-/// Retrieve ServiceNow credentials from OS keychain
+/// Retrieve ServiceNow credentials via the selected provider backend.
 ///
 /// # Tauri Command
-/// Called from frontend: `invoke('get_servicenow_credentials', { profileId })`
+/// Called from frontend: `invoke('get_servicenow_credentials', { profileId, providerId?, bwSession? })`
 #[tauri::command]
-pub fn get_servicenow_credentials(
+pub async fn get_servicenow_credentials(
     profile_id: String,
+    provider_id: Option<String>,
+    bw_session: Option<String>,
 ) -> Result<ServiceNowCredentialsResponse, String> {
-    keychain::get_servicenow_credentials(&profile_id)
-        .map(|creds| ServiceNowCredentialsResponse {
-            username: creds.username,
-            password: creds.password,
-        })
-        .map_err(|e| e.to_string())
+    let provider = resolve_provider(provider_id.as_deref().unwrap_or(""));
+    let key = format!("servicenow_{}", profile_id);
+
+    match provider {
+        "1password" => {
+            check_op_available().await?;
+            let json_str = one_password::read_secret(&key).await?;
+            let v: serde_json::Value = serde_json::from_str(&json_str)
+                .map_err(|e| format!("Failed to parse stored credentials: {e}"))?;
+            Ok(ServiceNowCredentialsResponse {
+                username: v["username"].as_str().unwrap_or("").to_string(),
+                password: v["password"].as_str().unwrap_or("").to_string(),
+            })
+        }
+        "bitwarden" => {
+            let session = bw_session.as_deref().unwrap_or("");
+            check_bw_available(session).await?;
+            let json_str = bitwarden::read_secret(&key, session).await?;
+            let v: serde_json::Value = serde_json::from_str(&json_str)
+                .map_err(|e| format!("Failed to parse stored credentials: {e}"))?;
+            Ok(ServiceNowCredentialsResponse {
+                username: v["username"].as_str().unwrap_or("").to_string(),
+                password: v["password"].as_str().unwrap_or("").to_string(),
+            })
+        }
+        _ => keychain::get_servicenow_credentials(&profile_id)
+            .map(|creds| ServiceNowCredentialsResponse {
+                username: creds.username,
+                password: creds.password,
+            })
+            .map_err(|e| e.to_string()),
+    }
 }
 
-/// Delete ServiceNow credentials from OS keychain
+/// Delete ServiceNow credentials via the selected provider backend.
 ///
 /// # Tauri Command
-/// Called from frontend: `invoke('delete_servicenow_credentials', { profileId })`
+/// Called from frontend: `invoke('delete_servicenow_credentials', { profileId, providerId?, bwSession? })`
 #[tauri::command]
-pub fn delete_servicenow_credentials(profile_id: String) -> Result<(), String> {
-    keychain::delete_servicenow_credentials(&profile_id).map_err(|e| e.to_string())
-}
-
-/// Check if ServiceNow credentials exist for a profile
-///
-/// # Tauri Command
-/// Called from frontend: `invoke('has_servicenow_credentials', { profileId })`
-#[tauri::command]
-pub fn has_servicenow_credentials(
+pub async fn delete_servicenow_credentials(
     profile_id: String,
-) -> Result<CredentialExistsResponse, String> {
-    Ok(CredentialExistsResponse {
-        exists: keychain::has_servicenow_credentials(&profile_id),
-    })
+    provider_id: Option<String>,
+    bw_session: Option<String>,
+) -> Result<(), String> {
+    let provider = resolve_provider(provider_id.as_deref().unwrap_or(""));
+    let key = format!("servicenow_{}", profile_id);
+
+    match provider {
+        "1password" => {
+            check_op_available().await?;
+            one_password::delete_secret(&key).await
+        }
+        "bitwarden" => {
+            let session = bw_session.as_deref().unwrap_or("");
+            check_bw_available(session).await?;
+            // Bitwarden delete needs the UUID; read first to get it, then delete by searching
+            // For simplicity we attempt a search-and-delete via the list approach
+            bitwarden::delete_secret(&key, session).await
+        }
+        _ => keychain::delete_servicenow_credentials(&profile_id).map_err(|e| e.to_string()),
+    }
 }
 
-/// Store API key in OS keychain
+/// Check if ServiceNow credentials exist for a profile.
 ///
 /// # Tauri Command
-/// Called from frontend: `invoke('store_api_key', { provider, profileId, apiKey })`
+/// Called from frontend: `invoke('has_servicenow_credentials', { profileId, providerId?, bwSession? })`
 #[tauri::command]
-pub fn store_api_key(
+pub async fn has_servicenow_credentials(
+    profile_id: String,
+    provider_id: Option<String>,
+    bw_session: Option<String>,
+) -> Result<CredentialExistsResponse, String> {
+    let provider = resolve_provider(provider_id.as_deref().unwrap_or(""));
+    let key = format!("servicenow_{}", profile_id);
+
+    match provider {
+        "1password" => {
+            if check_op_available().await.is_err() {
+                return Ok(CredentialExistsResponse { exists: false });
+            }
+            Ok(CredentialExistsResponse {
+                exists: one_password::read_secret(&key).await.is_ok(),
+            })
+        }
+        "bitwarden" => {
+            let session = bw_session.as_deref().unwrap_or("");
+            if check_bw_available(session).await.is_err() {
+                return Ok(CredentialExistsResponse { exists: false });
+            }
+            Ok(CredentialExistsResponse {
+                exists: bitwarden::read_secret(&key, session).await.is_ok(),
+            })
+        }
+        _ => Ok(CredentialExistsResponse {
+            exists: keychain::has_servicenow_credentials(&profile_id),
+        }),
+    }
+}
+
+// ── API key commands ──────────────────────────────────────────────────────────
+
+/// Store API key via the selected provider backend.
+///
+/// # Tauri Command
+/// Called from frontend: `invoke('store_api_key', { provider, profileId, apiKey, providerId?, bwSession? })`
+#[tauri::command]
+pub async fn store_api_key(
     provider: String,
     profile_id: String,
     api_key: String,
+    provider_id: Option<String>,
+    bw_session: Option<String>,
 ) -> Result<(), String> {
-    keychain::store_api_key(&provider, &profile_id, &api_key).map_err(|e| e.to_string())
+    let backend = resolve_provider(provider_id.as_deref().unwrap_or(""));
+    let key = format!("{}_{}", provider, profile_id);
+
+    match backend {
+        "1password" => {
+            check_op_available().await?;
+            one_password::write_secret(&key, &api_key).await
+        }
+        "bitwarden" => {
+            let session = bw_session.as_deref().unwrap_or("");
+            check_bw_available(session).await?;
+            bitwarden::write_secret(&key, &api_key, session)
+                .await
+                .map(|_uuid| ())
+        }
+        _ => keychain::store_api_key(&provider, &profile_id, &api_key).map_err(|e| e.to_string()),
+    }
 }
 
-/// Retrieve API key from OS keychain
+/// Retrieve API key via the selected provider backend.
 ///
 /// # Tauri Command
-/// Called from frontend: `invoke('get_api_key', { provider, profileId })`
+/// Called from frontend: `invoke('get_api_key', { provider, profileId, providerId?, bwSession? })`
 #[tauri::command]
-pub fn get_api_key(provider: String, profile_id: String) -> Result<String, String> {
-    keychain::get_api_key(&provider, &profile_id).map_err(|e| e.to_string())
-}
-
-/// Delete API key from OS keychain
-///
-/// # Tauri Command
-/// Called from frontend: `invoke('delete_api_key', { provider, profileId })`
-#[tauri::command]
-pub fn delete_api_key(provider: String, profile_id: String) -> Result<(), String> {
-    keychain::delete_api_key(&provider, &profile_id).map_err(|e| e.to_string())
-}
-
-/// Check if API key exists for a provider
-///
-/// # Tauri Command
-/// Called from frontend: `invoke('has_api_key', { provider, profileId })`
-#[tauri::command]
-pub fn has_api_key(
+pub async fn get_api_key(
     provider: String,
     profile_id: String,
+    provider_id: Option<String>,
+    bw_session: Option<String>,
+) -> Result<String, String> {
+    let backend = resolve_provider(provider_id.as_deref().unwrap_or(""));
+    let key = format!("{}_{}", provider, profile_id);
+
+    match backend {
+        "1password" => {
+            check_op_available().await?;
+            one_password::read_secret(&key).await
+        }
+        "bitwarden" => {
+            let session = bw_session.as_deref().unwrap_or("");
+            check_bw_available(session).await?;
+            bitwarden::read_secret(&key, session).await
+        }
+        _ => keychain::get_api_key(&provider, &profile_id).map_err(|e| e.to_string()),
+    }
+}
+
+/// Delete API key via the selected provider backend.
+///
+/// # Tauri Command
+/// Called from frontend: `invoke('delete_api_key', { provider, profileId, providerId?, bwSession? })`
+#[tauri::command]
+pub async fn delete_api_key(
+    provider: String,
+    profile_id: String,
+    provider_id: Option<String>,
+    bw_session: Option<String>,
+) -> Result<(), String> {
+    let backend = resolve_provider(provider_id.as_deref().unwrap_or(""));
+    let key = format!("{}_{}", provider, profile_id);
+
+    match backend {
+        "1password" => {
+            check_op_available().await?;
+            one_password::delete_secret(&key).await
+        }
+        "bitwarden" => {
+            let session = bw_session.as_deref().unwrap_or("");
+            check_bw_available(session).await?;
+            bitwarden::delete_secret(&key, session).await
+        }
+        _ => keychain::delete_api_key(&provider, &profile_id).map_err(|e| e.to_string()),
+    }
+}
+
+/// Check if API key exists for a provider via the selected backend.
+///
+/// # Tauri Command
+/// Called from frontend: `invoke('has_api_key', { provider, profileId, providerId?, bwSession? })`
+#[tauri::command]
+pub async fn has_api_key(
+    provider: String,
+    profile_id: String,
+    provider_id: Option<String>,
+    bw_session: Option<String>,
 ) -> Result<CredentialExistsResponse, String> {
-    Ok(CredentialExistsResponse {
-        exists: keychain::has_api_key(&provider, &profile_id),
-    })
+    let backend = resolve_provider(provider_id.as_deref().unwrap_or(""));
+    let key = format!("{}_{}", provider, profile_id);
+
+    match backend {
+        "1password" => {
+            if check_op_available().await.is_err() {
+                return Ok(CredentialExistsResponse { exists: false });
+            }
+            Ok(CredentialExistsResponse {
+                exists: one_password::read_secret(&key).await.is_ok(),
+            })
+        }
+        "bitwarden" => {
+            let session = bw_session.as_deref().unwrap_or("");
+            if check_bw_available(session).await.is_err() {
+                return Ok(CredentialExistsResponse { exists: false });
+            }
+            Ok(CredentialExistsResponse {
+                exists: bitwarden::read_secret(&key, session).await.is_ok(),
+            })
+        }
+        _ => Ok(CredentialExistsResponse {
+            exists: keychain::has_api_key(&provider, &profile_id),
+        }),
+    }
 }
 
 /// Fetch a ServiceNow OAuth 2.0 Bearer token using the Resource Owner Password flow.
@@ -269,11 +489,12 @@ pub async fn now_assist_oauth_login(
     // ── 2. Generate PKCE code_verifier + code_challenge (S256) ───────────────
     // ServiceNow OAuth requires PKCE (RFC 7636) on the Authorization Code flow.
     use rand::RngCore;
+    use rand::rngs::OsRng;
     use sha2::{Digest, Sha256};
     use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 
     let mut verifier_bytes = [0u8; 32];
-    rand::thread_rng().fill_bytes(&mut verifier_bytes);
+    OsRng.fill_bytes(&mut verifier_bytes);
     let code_verifier = URL_SAFE_NO_PAD.encode(verifier_bytes);
 
     let challenge_hash = Sha256::digest(code_verifier.as_bytes());
@@ -281,7 +502,7 @@ pub async fn now_assist_oauth_login(
 
     // ── 3. Build the authorization URL ────────────────────────────────────────
     let mut state_bytes = [0u8; 32];
-    rand::thread_rng().fill_bytes(&mut state_bytes);
+    OsRng.fill_bytes(&mut state_bytes);
     let state = URL_SAFE_NO_PAD.encode(state_bytes);
 
     // Request `openid` scope so ServiceNow includes an `id_token` (JWT) in the
@@ -325,6 +546,12 @@ pub async fn now_assist_oauth_login(
     .map_err(|e| format!("Failed to read callback: {}", e))?;
 
     let request = String::from_utf8_lossy(&buf[..n]).to_string();
+
+    // Guard against oversized or malformed request lines (no newline within first 2048 bytes).
+    let first_line_end = request.find('\n').unwrap_or(request.len());
+    if first_line_end > 2048 {
+        return Err("OAuth callback request too large".to_string());
+    }
 
     // ── 6. Respond to the browser with a success page ─────────────────────────
     let html = concat!(

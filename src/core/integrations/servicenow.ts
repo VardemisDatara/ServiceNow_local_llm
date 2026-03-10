@@ -48,7 +48,7 @@ export interface ServiceNowHealthResponse {
 
 export interface ServiceNowQueryOptions {
   sysparm_query?: string; // Encoded query string
-  sysparm_limit?: number; // Max records to return (default 10000)
+  sysparm_limit?: number; // Max records to return (default: 100)
   sysparm_offset?: number; // Starting record number
   sysparm_fields?: string; // Comma-separated field names
   sysparm_display_value?: 'true' | 'false' | 'all'; // Display values vs actual values

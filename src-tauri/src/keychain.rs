@@ -210,6 +210,7 @@ pub fn delete_api_key(provider: &str, profile_id: &str) -> KeychainResult<()> {
 pub fn has_servicenow_credentials(profile_id: &str) -> bool {
     let account_name = format!("servicenow_{}", profile_id);
     match Entry::new(SERVICE_NAME, &account_name) {
+        // Note: keyring-rs has no metadata-only API; we decrypt and discard to check existence
         Ok(entry) => entry.get_password().is_ok(),
         Err(_) => false,
     }
@@ -227,6 +228,7 @@ pub fn has_servicenow_credentials(profile_id: &str) -> bool {
 pub fn has_api_key(provider: &str, profile_id: &str) -> bool {
     let account_name = format!("{}_{}", provider, profile_id);
     match Entry::new(SERVICE_NAME, &account_name) {
+        // Note: keyring-rs has no metadata-only API; we decrypt and discard to check existence
         Ok(entry) => entry.get_password().is_ok(),
         Err(_) => false,
     }

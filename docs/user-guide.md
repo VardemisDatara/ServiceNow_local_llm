@@ -68,7 +68,7 @@ Manage configuration profiles. Each profile stores:
 - Web search provider and API key
 - Cloud LLM provider, model, and API key
 
-**API keys are stored securely in the OS keychain** — never in the database.
+**Credentials are stored securely** — in the OS keychain by default, or in 1Password / Bitwarden if you configure a different provider under **Credential Storage** (see below). Credentials are never written to the database in plaintext.
 
 ---
 

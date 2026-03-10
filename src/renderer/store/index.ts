@@ -3,6 +3,7 @@ import { devtools, persist } from 'zustand/middleware';
 import { useShallow } from 'zustand/react/shallow';
 import type { ConfigurationProfile } from '../../core/storage/schema';
 import type { NowAssistTool } from '../../core/services/now-assist-mcp-client';
+import type { ProviderId, ProviderStatus } from '../../core/services/credential-provider';
 
 /**
  * Global application state using Zustand
@@ -49,6 +50,13 @@ export interface AppState {
   nowAssistConnected: boolean;
   nowAssistTools: NowAssistTool[];
   nowAssistError: string | null;
+
+  // Credential Provider Config (T012 — multi-vault)
+  providerConfig: {
+    defaultProvider: ProviderId;
+    overrides: Record<string, ProviderId>;
+    providerStatuses: ProviderStatus[];
+  };
 }
 
 export interface AppActions {
@@ -87,6 +95,12 @@ export interface AppActions {
   setNowAssistConnected: (connected: boolean) => void;
   setNowAssistTools: (tools: NowAssistTool[]) => void;
   setNowAssistError: (error: string | null) => void;
+
+  // Provider Config Actions (T012 — multi-vault)
+  setDefaultProvider: (id: ProviderId) => void;
+  setOverride: (key: string, id: ProviderId) => void;
+  removeOverride: (key: string) => void;
+  setProviderStatuses: (statuses: ProviderStatus[]) => void;
 }
 
 export type AppStore = AppState & AppActions;
@@ -127,6 +141,13 @@ const initialState: AppState = {
   nowAssistConnected: false,
   nowAssistTools: [],
   nowAssistError: null,
+
+  // Credential Provider Config
+  providerConfig: {
+    defaultProvider: 'keychain' as ProviderId,
+    overrides: {} as Record<string, ProviderId>,
+    providerStatuses: [] as ProviderStatus[],
+  },
 };
 
 // ============================================================================
@@ -215,6 +236,33 @@ export const useAppStore = create<AppStore>()(
         setNowAssistConnected: (connected) => set({ nowAssistConnected: connected }),
         setNowAssistTools: (tools) => set({ nowAssistTools: tools }),
         setNowAssistError: (error) => set({ nowAssistError: error }),
+
+        // Provider Config Actions (T012 — multi-vault)
+        setDefaultProvider: (id) =>
+          set((state) => ({
+            providerConfig: { ...state.providerConfig, defaultProvider: id },
+          })),
+
+        setOverride: (key, id) =>
+          set((state) => ({
+            providerConfig: {
+              ...state.providerConfig,
+              overrides: { ...state.providerConfig.overrides, [key]: id },
+            },
+          })),
+
+        removeOverride: (key) =>
+          set((state) => {
+            const { [key]: _removed, ...rest } = state.providerConfig.overrides;
+            return {
+              providerConfig: { ...state.providerConfig, overrides: rest },
+            };
+          }),
+
+        setProviderStatuses: (statuses) =>
+          set((state) => ({
+            providerConfig: { ...state.providerConfig, providerStatuses: statuses },
+          })),
       }),
       {
         name: 'servicenow-mcp-bridge-storage',
@@ -237,6 +285,15 @@ export const useAppStore = create<AppStore>()(
 export const useNowAssistConnected = () => useAppStore((state) => state.nowAssistConnected);
 export const useNowAssistTools = () => useAppStore((state) => state.nowAssistTools);
 export const useNowAssistError = () => useAppStore((state) => state.nowAssistError);
+
+// Provider Config selectors (T012 — multi-vault)
+// useShallow prevents infinite re-render from new object reference on every call
+export const useProviderConfig = () =>
+  useAppStore(useShallow((state) => state.providerConfig));
+export const useProviderStatuses = () =>
+  useAppStore((state) => state.providerConfig.providerStatuses);
+export const useDefaultProvider = () =>
+  useAppStore((state) => state.providerConfig.defaultProvider);
 
 export const useActiveProfile = () => useAppStore((state) => state.activeProfile);
 export const useProfiles = () => useAppStore((state) => state.profiles);
@@ -327,6 +384,18 @@ export const appActions = {
 
   setNowAssistError: (error: string | null) =>
     useAppStore.getState().setNowAssistError(error),
+
+  setDefaultProvider: (id: ProviderId) =>
+    useAppStore.getState().setDefaultProvider(id),
+
+  setOverride: (key: string, id: ProviderId) =>
+    useAppStore.getState().setOverride(key, id),
+
+  removeOverride: (key: string) =>
+    useAppStore.getState().removeOverride(key),
+
+  setProviderStatuses: (statuses: ProviderStatus[]) =>
+    useAppStore.getState().setProviderStatuses(statuses),
 };
 
 export default useAppStore;

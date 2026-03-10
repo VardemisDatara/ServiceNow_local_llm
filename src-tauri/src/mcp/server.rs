@@ -1,7 +1,33 @@
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::time::{Duration, Instant};
+use std::time::Instant;
+
+static HTTP_CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
+
+fn get_http_client() -> &'static reqwest::Client {
+    HTTP_CLIENT.get_or_init(reqwest::Client::new)
+}
+
+/// Returns true when the IP string belongs to a private / non-routable range:
+/// RFC 1918 (10.x, 172.16–31.x, 192.168.x), loopback (127.x), link-local (169.254.x).
+fn is_private_ip(ip: &str) -> bool {
+    if ip.starts_with("10.") || ip.starts_with("192.168.") || ip.starts_with("127.") || ip.starts_with("169.254.") {
+        return true;
+    }
+    // 172.16.0.0 – 172.31.255.255
+    if let Some(rest) = ip.strip_prefix("172.") {
+        let second_octet: u8 = rest
+            .split('.')
+            .next()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        if (16..=31).contains(&second_octet) {
+            return true;
+        }
+    }
+    false
+}
 
 /// Sanitize a value before embedding it in a ServiceNow sysparm_query string.
 /// Removes `^` (query logic operator), `&` (URL separator), and control chars
@@ -128,10 +154,7 @@ pub async fn check_ollama_tool_calls(
     messages: Vec<McpMessageInput>,
     tools: Vec<OllamaToolDefinition>,
 ) -> Result<OllamaToolCheckResult, String> {
-    let client = Client::builder()
-        .timeout(Duration::from_secs(60))
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = get_http_client();
 
     let request_body = serde_json::json!({
         "model": model,
@@ -187,6 +210,10 @@ pub async fn execute_mcp_tool(
     servicenow_url: String,
     profile_id: String,
 ) -> Result<MCPToolResult, String> {
+    if tool_name.len() > 64 || !tool_name.chars().all(|c| c.is_alphanumeric() || c == '_') {
+        return Err(format!("Invalid tool name: {}", tool_name));
+    }
+
     let start = Instant::now();
 
     // Load credentials from keychain — no IPC round-trip needed
@@ -290,10 +317,7 @@ async fn analyze_threat_indicator(
         other => return Err(format!("Invalid indicator_type: '{other}'")),
     };
 
-    let client = Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = get_http_client();
 
     let base_url = servicenow_url.trim_end_matches('/');
     let url = format!("{base_url}/api/now/table/sn_ti_observable");
@@ -367,10 +391,7 @@ async fn assess_vulnerability(
     let cve_id_raw = args["cve_id"].as_str().ok_or("Missing 'cve_id' argument")?;
     let cve_id = validate_cve_id(cve_id_raw)?;
 
-    let client = Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = get_http_client();
 
     let base_url = servicenow_url.trim_end_matches('/');
     let url = format!("{base_url}/api/now/table/sn_vul_entry");
@@ -473,10 +494,7 @@ async fn query_incidents(
     let extra_filter_raw = args["query"].as_str().unwrap_or("");
     let extra_filter = sanitize_sn_param(extra_filter_raw.trim());
 
-    let client = Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = get_http_client();
 
     let base_url = servicenow_url.trim_end_matches('/');
 
@@ -592,10 +610,7 @@ async fn get_incident_details(
         .ok_or("Missing 'number' argument")?;
     let number = validate_record_number(number_raw)?;
 
-    let client = Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = get_http_client();
 
     let base_url = servicenow_url.trim_end_matches('/');
 
@@ -796,10 +811,7 @@ async fn correlate_security_incidents(
         return Err("At least 2 incident IDs are required for correlation".to_string());
     }
 
-    let client = Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = get_http_client();
 
     let base_url = servicenow_url.trim_end_matches('/');
     let mut fetched: Vec<Value> = Vec::new();
@@ -940,10 +952,7 @@ async fn generate_remediation_plan(
     // Fetch CVE context from ServiceNow if CVE IDs provided
     let mut cve_entries: Vec<Value> = Vec::new();
     if let Some(cve_ids) = vuln_data["cve_ids"].as_array() {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(30))
-            .build()
-            .map_err(|e| e.to_string())?;
+        let client = get_http_client();
 
         let base_url = servicenow_url.trim_end_matches('/');
 
@@ -1092,10 +1101,7 @@ async fn analyze_attack_surface(
 ) -> Result<Value, String> {
     let scan_depth = args["scan_depth"].as_str().unwrap_or("standard");
 
-    let client = Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = get_http_client();
 
     let base_url = servicenow_url.trim_end_matches('/');
 
@@ -1146,7 +1152,7 @@ async fn analyze_attack_surface(
                 "protocol": "tcp",
                 "service": "HTTPS",
                 "version": null,
-                "is_publicly_accessible": !ip.starts_with("10.") && !ip.starts_with("192.168.")
+                "is_publicly_accessible": !is_private_ip(ip)
             }))
         })
         .take(10)
@@ -1283,10 +1289,7 @@ async fn audit_security_compliance(
             _ => "latest",
         });
 
-    let client = Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = get_http_client();
 
     let base_url = servicenow_url.trim_end_matches('/');
 
@@ -1392,6 +1395,7 @@ async fn audit_security_compliance(
         failed
     );
 
+    let is_stub = policy_records.is_empty();
     Ok(serde_json::json!({
         "framework": framework,
         "framework_version": framework_version,
@@ -1405,6 +1409,8 @@ async fn audit_security_compliance(
         },
         "failed_controls": failed_controls,
         "remediation_priorities": remediation_priorities,
-        "next_audit_date": next_audit_str
+        "next_audit_date": next_audit_str,
+        "data_source": if is_stub { "stub" } else { "servicenow_grc" },
+        "warning": if is_stub { serde_json::json!("GRC data unavailable — values are placeholders") } else { serde_json::Value::Null }
     }))
 }

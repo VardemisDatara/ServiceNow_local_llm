@@ -118,6 +118,47 @@ Now Assist integration connects your local model to the ServiceNow Now Assist to
 
 ---
 
+## Credential Storage
+
+Choose where the app stores passwords and API keys. The setting is global and applies to all profiles.
+
+### Providers
+
+| Provider | Requirement | Notes |
+|----------|------------|-------|
+| **OS Keychain** *(default)* | None | macOS Keychain / Windows Credential Manager / Linux Secret Service |
+| **1Password** | 1Password CLI v2 (`op`) installed and signed in | Run `op signin` before using the app |
+| **Bitwarden** | Bitwarden CLI (`bw`) installed and vault unlocked | Run `bw unlock` to obtain a session token |
+
+### Selecting a Provider
+
+1. Open the **Credential Storage** section in Settings (collapsible panel).
+2. The app automatically detects which providers are installed.
+3. Select a provider radio button — only providers that are installed and authenticated show as **Ready**.
+4. Click **Save**. If credentials are already stored in the current provider, a **migration wizard** opens.
+
+### Credential Migration
+
+When you switch the active provider, the migration wizard:
+1. Reads all stored credential keys from the current provider (OS keychain).
+2. Writes them to the selected target provider.
+3. If all writes succeed, updates the active provider and removes the originals.
+4. If any write fails, rolls back all partially-written items and leaves the original provider unchanged.
+
+### Per-Credential Override
+
+To store a specific key (e.g. an API key) in a different vault than the global default:
+
+1. Find the credential field in Settings (ServiceNow password, API key, etc.).
+2. Use the **Provider** dropdown next to that field.
+3. Select any **Ready** provider — or choose **(using default)** to revert.
+
+### Provider Lock Handling
+
+If the active vault locks mid-session (e.g. 1Password session expires), the app returns a `PROVIDER_LOCKED` error and prompts you to re-authenticate. No silent fallback occurs.
+
+---
+
 ## Session Settings
 
 | Setting | Description |

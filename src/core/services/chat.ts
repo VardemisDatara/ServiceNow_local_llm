@@ -97,6 +97,11 @@ export async function sendMessage(opts: SendMessageOptions): Promise<Conversatio
       content: m.content,
     }));
 
+  // Track whether the current user message has been explicitly appended to ollamaMessages.
+  // Using an explicit flag is more reliable than content-matching (which can produce false
+  // positives when the user repeats an earlier message verbatim).
+  let userMessageAdded = false;
+
   // 2b. Inject a system message listing available Now Assist tools when connected.
   // This lets the model correctly describe available tools and understand injected
   // tool results.  Done BEFORE tool calling so the model has full context.
@@ -181,8 +186,9 @@ export async function sendMessage(opts: SendMessageOptions): Promise<Conversatio
   }
 
   // Add current user message after any injected search context
-  if (!ollamaMessages.some((m) => m.role === 'user' && m.content === content)) {
+  if (!userMessageAdded) {
     ollamaMessages.push({ role: 'user', content });
+    userMessageAdded = true;
   }
 
   // 4. Stream LLM response — route to cloud provider or local Ollama (T112/T118)

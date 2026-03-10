@@ -42,6 +42,12 @@ pub fn run() {
               sql: include_str!("../../src/core/storage/migrations/0003_now_assist_server_id.sql"),
               kind: tauri_plugin_sql::MigrationKind::Up,
             },
+            tauri_plugin_sql::Migration {
+              version: 5,
+              description: "provider configuration tables",
+              sql: include_str!("../../src/core/storage/migrations/0004_provider_config.sql"),
+              kind: tauri_plugin_sql::MigrationKind::Up,
+            },
           ],
         )
         .build(),
@@ -72,6 +78,10 @@ pub fn run() {
       // Now Assist MCP proxy — bypasses WebView CORS
       commands::mcp_proxy::now_assist_connect,
       commands::mcp_proxy::now_assist_call_tool,
+      // Credential provider availability (multi-vault)
+      commands::provider::get_available_providers,
+      // Credential migration (US3)
+      commands::provider::migrate_credentials,
     ])
     .setup(|_app| {
       log::info!("ServiceNow MCP Bridge starting...");

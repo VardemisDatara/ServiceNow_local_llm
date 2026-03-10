@@ -81,15 +81,15 @@ pub struct OllamaClient {
 
 impl OllamaClient {
     /// Create a new Ollama client
-    pub fn new(config: OllamaConfig) -> Self {
+    pub fn new(config: OllamaConfig) -> OllamaResult<Self> {
         let client = Client::builder()
             .timeout(Duration::from_secs(config.timeout_secs))
             .build()
-            .expect("Failed to build HTTP client");
+            .map_err(|e| OllamaError::ConnectionFailed(format!("Failed to build HTTP client: {e}")))?;
 
         log::info!("Ollama client initialized: {}", config.endpoint);
 
-        Self { config, client }
+        Ok(Self { config, client })
     }
 
     /// Test connection to Ollama instance
@@ -159,7 +159,7 @@ mod tests {
     async fn test_health_check() {
         // This test requires Ollama to be running
         let config = OllamaConfig::default();
-        let client = OllamaClient::new(config);
+        let client = OllamaClient::new(config).expect("Failed to build HTTP client in test");
 
         // This will fail if Ollama is not running, which is expected
         let result = client.health_check().await;

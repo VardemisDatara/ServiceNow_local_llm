@@ -1,6 +1,6 @@
 [package]
 name = "servicenow-mcp-bridge"
-version = "1.0.0"
+version = "1.1.0"
 description = "ServiceNow MCP Bridge - Desktop application for bidirectional AI communication"
 authors = []
 license = "MIT"
@@ -57,3 +57,6 @@ rand = "0.8"
 
 # Date/time formatting
 chrono = "0.4"
+
+# CLI binary detection (multi-vault credential provider)
+which = "6"

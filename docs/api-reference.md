@@ -243,6 +243,64 @@ Log level is set to `DEBUG` in development and `INFO` in production.
 
 ---
 
+## Credential Provider
+
+### `credential-provider.ts` — Shared Types
+
+```typescript
+import type { ProviderId, ProviderStatus, ProviderConfiguration, CredentialKey } from './src/core/services/credential-provider';
+import { CREDENTIAL_KEYS, PROVIDER_DISPLAY_NAMES, isCredentialKey, isProviderId } from './src/core/services/credential-provider';
+
+// ProviderId: 'keychain' | '1password' | 'bitwarden'
+// CredentialKey: one of the 10 known keys (servicenow_url, llm_openai, ...)
+```
+
+### `credential-router.ts` — Provider Routing
+
+```typescript
+import {
+  getAvailableProviders,
+  getProviderConfiguration,
+  setDefaultProvider,
+  setCredentialProviderOverride,
+  removeCredentialProviderOverride,
+  migrateCredentials,
+} from './src/core/services/credential-router';
+
+// Query installed/authenticated providers
+const statuses: ProviderStatus[] = await getAvailableProviders();
+
+// Read current config (default provider + per-key overrides)
+const config: ProviderConfiguration = await getProviderConfiguration();
+
+// Change global default
+await setDefaultProvider('1password');
+
+// Override a single key
+await setCredentialProviderOverride('llm_openai', 'keychain');
+await removeCredentialProviderOverride('llm_openai');
+
+// Migrate all credentials from OS keychain to a new provider
+const result = await migrateCredentials('bitwarden', bwSessionToken);
+// result.success, result.migrated[], result.failed[]
+```
+
+### `provider-config.ts` — Repository
+
+```typescript
+import { ProviderConfigRepository } from './src/core/storage/repositories/provider-config';
+
+const repo = new ProviderConfigRepository();
+const defaultProvider = await repo.getDefaultProvider();       // 'keychain'
+await repo.setDefaultProvider('1password');
+const override = await repo.getOverride('llm_openai');        // undefined | ProviderId
+await repo.setOverride('llm_openai', 'keychain');
+await repo.removeOverride('llm_openai');
+const all = await repo.getAllOverrides();                      // Record<string, ProviderId>
+```
+
+---
+
 ## IPC (Tauri Bridge)
 
 ```typescript

@@ -26,7 +26,20 @@ pub async fn test_ollama_connection(endpoint: String) -> Result<OllamaTestResult
         timeout_secs: 10,
     };
 
-    let client = OllamaClient::new(config);
+    let client = match OllamaClient::new(config) {
+        Ok(c) => c,
+        Err(e) => {
+            let latency_ms = start.elapsed().as_millis() as u64;
+            log::warn!("Failed to create Ollama client: {}", e);
+            return Ok(OllamaTestResult {
+                success: false,
+                version: None,
+                models: vec![],
+                latency_ms,
+                error: Some(e.to_string()),
+            });
+        }
+    };
 
     // Test health check
     let version = match client.health_check().await {

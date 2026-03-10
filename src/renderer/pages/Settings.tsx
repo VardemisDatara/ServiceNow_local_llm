@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Configuration } from '../components/Configuration';
 import { ProfileSelector } from '../components/ProfileSelector';
+import { CredentialStoragePanel } from '../components/CredentialStoragePanel';
 import type { ConfigurationFormValues } from '../../models/Configuration';
 import { configurationProfileRepository } from '../../core/storage/repositories/configuration';
 import { IPC } from '../../main/ipc';
 import { useAppStore, useProfiles, useActiveProfile } from '../store/index';
+import { getAvailableProviders } from '../../core/services/credential-router';
 import { logger } from '../../utils/logger';
 
 /**
@@ -17,14 +19,23 @@ type SettingsMode = 'view' | 'edit' | 'new';
 export function Settings() {
   const profiles = useProfiles();
   const activeProfile = useActiveProfile();
-  const { setProfiles, setActiveProfile, addProfile, updateProfile, removeProfile, setError, clearError } = useAppStore();
+  const { setProfiles, setActiveProfile, addProfile, updateProfile, removeProfile, setError, clearError, setProviderStatuses } = useAppStore();
   const [mode, setMode] = useState<SettingsMode>('view');
   const [loading, setLoading] = useState(true);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   // Load profiles on mount
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void loadProfiles(); }, []);
+  useEffect(() => { void loadProfiles(); void loadProviderStatuses(); }, []);
+
+  async function loadProviderStatuses() {
+    try {
+      const statuses = await getAvailableProviders();
+      setProviderStatuses(statuses);
+    } catch (err) {
+      logger.warn('Failed to load provider statuses', {}, err as Error);
+    }
+  }
 
   async function loadProfiles() {
     setLoading(true);
@@ -340,6 +351,43 @@ export function Settings() {
           )}
         </>
       )}
+      {/* Credential Storage section */}
+      <details
+        style={{ marginTop: '24px' }}
+        onToggle={(e) => {
+          if ((e.currentTarget as HTMLDetailsElement).open) {
+            void loadProviderStatuses();
+          }
+        }}
+      >
+        <summary
+          style={{
+            cursor: 'pointer',
+            fontSize: '1rem',
+            fontWeight: 700,
+            color: '#111827',
+            padding: '8px 0',
+            userSelect: 'none',
+            listStyle: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}
+        >
+          ▸ Credential Storage
+        </summary>
+        <div
+          style={{
+            marginTop: '12px',
+            padding: '16px',
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            backgroundColor: '#f9fafb',
+          }}
+        >
+          <CredentialStoragePanel />
+        </div>
+      </details>
     </div>
   );
 }

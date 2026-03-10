@@ -10,6 +10,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.1.0] - 2026-03-10
+
+### Added
+- Multi-vault credential provider support (004-multi-vault-credentials)
+  - Store app credentials in 1Password CLI or Bitwarden CLI instead of OS keychain
+  - Global default provider selection in Settings → Credential Storage
+  - Per-credential provider override — set a different vault per credential key
+  - Credential migration wizard when switching providers (atomic: rolls back on any failure)
+  - Re-checks provider availability on every credential operation; returns `PROVIDER_LOCKED` if vault locks mid-session
+  - Supports macOS, Windows, and Linux
+
+### Fixed
+- `edit_secret` in 1Password integration: secret value was exposed as a CLI argument; replaced with delete-then-recreate via stdin JSON
+- `delete_secret` in Bitwarden integration: now resolves item UUID via `bw list items --search` before calling `bw delete item` (which requires UUID, not name)
+- `migrate_credentials`: migrating to OS Keychain (the source provider) was a silent no-op; now returns an explicit error
+
+### Security
+- Credential values are never passed as CLI arguments to `op` or `bw` — all writes and updates use stdin JSON
+
+---
+
 ## [0.3.0] - 2026-02-13
 
 ### Added

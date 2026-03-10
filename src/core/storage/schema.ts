@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 /**
@@ -242,6 +242,39 @@ export const webSearchResults = sqliteTable('web_search_results', {
     .$defaultFn(() => new Date(Date.now() + 24 * 60 * 60 * 1000)), // 24 hours cache
 });
 
+/**
+ * ProviderConfiguration — key/value store for credential provider settings.
+ * Holds 'default_provider' and per-credential overrides like 'override:llm_openai'.
+ * Feature: 004-multi-vault-credentials
+ */
+export const providerConfiguration = sqliteTable('provider_configuration', {
+  key: text('key').primaryKey().notNull(),
+  value: text('value').notNull(),
+  updatedAt: text('updated_at')
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
+/**
+ * CredentialProviderItemIds — caches external item IDs (e.g. Bitwarden UUIDs)
+ * so subsequent read/update/delete operations use the UUID directly.
+ * Feature: 004-multi-vault-credentials
+ */
+export const credentialProviderItemIds = sqliteTable(
+  'credential_provider_item_ids',
+  {
+    credentialKey: text('credential_key').notNull(),
+    providerId: text('provider_id').notNull(),
+    externalItemId: text('external_item_id').notNull(),
+    updatedAt: text('updated_at')
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.credentialKey, table.providerId] }),
+  })
+);
+
 // Indexes for performance
 export const indexes = {
   // Configuration profiles - quick active lookup
@@ -295,3 +328,7 @@ export type AnalysisResult = typeof analysisResults.$inferSelect;
 export type NewAnalysisResult = typeof analysisResults.$inferInsert;
 export type WebSearchResult = typeof webSearchResults.$inferSelect;
 export type NewWebSearchResult = typeof webSearchResults.$inferInsert;
+export type ProviderConfigurationRow = typeof providerConfiguration.$inferSelect;
+export type NewProviderConfigurationRow = typeof providerConfiguration.$inferInsert;
+export type CredentialProviderItemId = typeof credentialProviderItemIds.$inferSelect;
+export type NewCredentialProviderItemId = typeof credentialProviderItemIds.$inferInsert;
