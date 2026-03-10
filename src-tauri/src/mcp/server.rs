@@ -3,6 +3,54 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::time::{Duration, Instant};
 
+/// Sanitize a value before embedding it in a ServiceNow sysparm_query string.
+/// Removes `^` (query logic operator), `&` (URL separator), and control chars
+/// that could inject additional query conditions.
+fn sanitize_sn_param(value: &str) -> String {
+    value
+        .chars()
+        .filter(|&c| c != '^' && c != '&' && c != '\n' && c != '\r')
+        .take(200)
+        .collect()
+}
+
+/// Validate a ServiceNow record number (e.g. INC0001234, SIR0012345, CHG0000001).
+/// Accepts: 2-8 uppercase ASCII letters followed by 4-10 ASCII digits.
+fn validate_record_number(number: &str) -> Result<String, String> {
+    let upper = number.trim().to_uppercase();
+    let prefix_len = upper.chars().take_while(|c| c.is_ascii_uppercase()).count();
+    let suffix_len = upper.chars().skip_while(|c| c.is_ascii_uppercase()).count();
+    let is_all_digits = upper.chars().skip(prefix_len).all(|c| c.is_ascii_digit());
+    if prefix_len >= 2
+        && prefix_len <= 8
+        && suffix_len >= 4
+        && suffix_len <= 10
+        && is_all_digits
+        && upper.len() == prefix_len + suffix_len
+    {
+        Ok(upper)
+    } else {
+        Err(format!("Invalid record number format: '{number}'"))
+    }
+}
+
+/// Validate a CVE identifier (CVE-YYYY-NNNNN format).
+fn validate_cve_id(cve: &str) -> Result<String, String> {
+    let upper = cve.trim().to_uppercase();
+    let parts: Vec<&str> = upper.splitn(3, '-').collect();
+    if parts.len() == 3
+        && parts[0] == "CVE"
+        && parts[1].len() == 4
+        && parts[1].chars().all(|c| c.is_ascii_digit())
+        && !parts[2].is_empty()
+        && parts[2].chars().all(|c| c.is_ascii_digit())
+    {
+        Ok(upper)
+    } else {
+        Err(format!("Invalid CVE ID format: '{cve}' (expected CVE-YYYY-NNNNN)"))
+    }
+}
+
 /// A function definition passed to Ollama for tool calling
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct OllamaFunction {
@@ -230,12 +278,17 @@ async fn analyze_threat_indicator(
     username: &str,
     password: &str,
 ) -> Result<Value, String> {
-    let indicator = args["indicator"]
+    let indicator_raw = args["indicator"]
         .as_str()
         .ok_or("Missing 'indicator' argument")?;
-    let indicator_type = args["indicator_type"]
+    let indicator_type_raw = args["indicator_type"]
         .as_str()
         .ok_or("Missing 'indicator_type' argument")?;
+    let indicator = sanitize_sn_param(indicator_raw);
+    let indicator_type = match indicator_type_raw {
+        "ip" | "domain" | "hash" | "url" | "email" => indicator_type_raw.to_string(),
+        other => return Err(format!("Invalid indicator_type: '{other}'")),
+    };
 
     let client = Client::builder()
         .timeout(Duration::from_secs(30))
@@ -244,7 +297,7 @@ async fn analyze_threat_indicator(
 
     let base_url = servicenow_url.trim_end_matches('/');
     let url = format!("{base_url}/api/now/table/sn_ti_observable");
-    let query = format!("value={indicator}&type={indicator_type}");
+    let query = format!("value={indicator}^type={indicator_type}");
 
     let response = client
         .get(&url)
@@ -311,7 +364,8 @@ async fn assess_vulnerability(
     username: &str,
     password: &str,
 ) -> Result<Value, String> {
-    let cve_id = args["cve_id"].as_str().ok_or("Missing 'cve_id' argument")?;
+    let cve_id_raw = args["cve_id"].as_str().ok_or("Missing 'cve_id' argument")?;
+    let cve_id = validate_cve_id(cve_id_raw)?;
 
     let client = Client::builder()
         .timeout(Duration::from_secs(30))
@@ -416,7 +470,8 @@ async fn query_incidents(
     let state = args["state"].as_str().unwrap_or("open");
     let limit = args["limit"].as_u64().unwrap_or(50).min(100) as usize;
     // Optional free-form filter appended to the sysparm_query (e.g. "number=SIR0015003")
-    let extra_filter = args["query"].as_str().unwrap_or("").trim();
+    let extra_filter_raw = args["query"].as_str().unwrap_or("");
+    let extra_filter = sanitize_sn_param(extra_filter_raw.trim());
 
     let client = Client::builder()
         .timeout(Duration::from_secs(30))
@@ -532,11 +587,10 @@ async fn get_incident_details(
     username: &str,
     password: &str,
 ) -> Result<Value, String> {
-    let number = args["number"]
+    let number_raw = args["number"]
         .as_str()
-        .ok_or("Missing 'number' argument")?
-        .trim()
-        .to_uppercase();
+        .ok_or("Missing 'number' argument")?;
+    let number = validate_record_number(number_raw)?;
 
     let client = Client::builder()
         .timeout(Duration::from_secs(30))
@@ -751,10 +805,17 @@ async fn correlate_security_incidents(
     let mut fetched: Vec<Value> = Vec::new();
 
     for id_val in incident_ids.iter().take(10) {
-        let id = id_val.as_str().unwrap_or("");
-        if id.is_empty() {
+        let id_raw = id_val.as_str().unwrap_or("");
+        if id_raw.is_empty() {
             continue;
         }
+        let id = match validate_record_number(id_raw) {
+            Ok(n) => n,
+            Err(e) => {
+                log::warn!("correlate_security_incidents: skipping invalid id '{}': {}", id_raw, e);
+                continue;
+            }
+        };
 
         // Try sn_si_incident first, then fall back to incident
         for table in &["sn_si_incident", "incident"] {
@@ -887,10 +948,17 @@ async fn generate_remediation_plan(
         let base_url = servicenow_url.trim_end_matches('/');
 
         for cve_val in cve_ids.iter().take(5) {
-            let cve = cve_val.as_str().unwrap_or("");
-            if cve.is_empty() {
+            let cve_raw = cve_val.as_str().unwrap_or("");
+            if cve_raw.is_empty() {
                 continue;
             }
+            let cve = match validate_cve_id(cve_raw) {
+                Ok(c) => c,
+                Err(e) => {
+                    log::warn!("generate_remediation_plan: skipping invalid CVE '{}': {}", cve_raw, e);
+                    continue;
+                }
+            };
 
             let url = format!("{base_url}/api/now/table/sn_vul_entry");
             let query = format!("source_id={cve}");
