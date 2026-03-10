@@ -300,9 +300,9 @@ pub async fn now_assist_oauth_login(
     log::info!("now_assist_oauth_login: opening browser → {}", base);
 
     // ── 3. Open the authorization URL in the system browser ───────────────────
-    use tauri_plugin_shell::ShellExt;
-    app.shell()
-        .open(&auth_url, None)
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_url(&auth_url, None::<&str>)
         .map_err(|e| format!("Failed to open browser: {}", e))?;
 
     // ── 4. Wait for the OAuth callback (5-minute timeout) ─────────────────────
