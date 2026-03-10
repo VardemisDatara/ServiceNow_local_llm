@@ -218,7 +218,8 @@ export async function sendMessage(opts: SendMessageOptions): Promise<Conversatio
     });
   } else {
     // Local Ollama path: stream via Tauri Channel (IPC to Rust backend)
-    await new Promise<void>((resolve) => {
+    const STREAM_TIMEOUT_MS = 60_000;
+    const streamPromise = new Promise<void>((resolve) => {
       const channel = new Channel<ChatStreamEvent>();
 
       channel.onmessage = (event) => {
@@ -247,6 +248,18 @@ export async function sendMessage(opts: SendMessageOptions): Promise<Conversatio
         resolve();
       });
     });
+
+    const timeoutPromise = new Promise<void>((resolve) => {
+      setTimeout(() => {
+        if (!streamError && !fullResponse) {
+          streamError = 'Response timed out after 60 seconds. Ollama may be overloaded.';
+          onError(streamError);
+        }
+        resolve();
+      }, STREAM_TIMEOUT_MS);
+    });
+
+    await Promise.race([streamPromise, timeoutPromise]);
   }
 
   // T025: Append degradation note when a Now Assist tool was detected but skipped
