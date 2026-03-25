@@ -52,18 +52,6 @@ description: "Task list template for feature implementation"
 - [ ] T002 Initialize [language] project with [framework] dependencies
 - [ ] T003 [P] Configure linting and formatting tools
 
-### Phase 1 Validation Gates *(Constitution Requirement)*
-
-**Automated Gates**:
-- [ ] Linting/formatting checks configured and passing
-- [ ] Basic project structure validated
-
-**Manual Gates**:
-- [ ] Setup checklist reviewed and approved
-- [ ] Project structure aligns with plan.md
-
-**Documentation**: Create `specs/[feature]/phase1-validation.md` documenting gate results
-
 ---
 
 ## Phase 2: Foundational (Blocking Prerequisites)
@@ -80,22 +68,6 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T007 Create base models/entities that all stories depend on
 - [ ] T008 Configure error handling and logging infrastructure
 - [ ] T009 Setup environment configuration management
-
-### Phase 2 Validation Gates *(Constitution Requirement - CRITICAL)*
-
-**Automated Gates**:
-- [ ] All foundation tests passing (unit + integration)
-- [ ] Security scan passed (no critical/high vulnerabilities)
-- [ ] Code coverage ≥80% for foundation code
-- [ ] Linting/formatting checks passing
-
-**Manual Gates**:
-- [ ] Code review approved by at least one peer
-- [ ] Manual infrastructure validation complete (database, auth, etc.)
-- [ ] Architecture review approved
-- [ ] Foundation smoke test executed and documented
-
-**Documentation**: Create `specs/[feature]/phase2-validation.md` documenting gate results
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -123,23 +95,6 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T016 [US1] Add validation and error handling
 - [ ] T017 [US1] Add logging for user story 1 operations
 
-### User Story 1 Validation Gates *(Constitution Requirement)*
-
-**Automated Gates**:
-- [ ] All tests passing for US1 (unit, integration, contract)
-- [ ] Code coverage ≥80% for US1 code
-- [ ] Performance benchmarks met (if API endpoints)
-- [ ] Security scan passed
-- [ ] Linting/formatting checks passing
-
-**Manual Gates**:
-- [ ] Code review approved for US1 changes
-- [ ] Manual test plan executed and documented
-- [ ] UX review approved (if user-facing)
-- [ ] User acceptance testing complete (if applicable)
-
-**Documentation**: Create `specs/[feature]/us1-validation.md` documenting gate results
-
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
 
 ---
@@ -162,23 +117,6 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T022 [US2] Implement [endpoint/feature] in src/[location]/[file].py
 - [ ] T023 [US2] Integrate with User Story 1 components (if needed)
 
-### User Story 2 Validation Gates *(Constitution Requirement)*
-
-**Automated Gates**:
-- [ ] All tests passing for US2 (unit, integration, contract)
-- [ ] Code coverage ≥80% for US2 code
-- [ ] Performance benchmarks met
-- [ ] Regression tests passing (US1 + US2)
-- [ ] Security scan passed
-
-**Manual Gates**:
-- [ ] Code review approved for US2 changes
-- [ ] Manual test plan executed and documented
-- [ ] UX review approved (if user-facing)
-- [ ] US1 + US2 integration validated
-
-**Documentation**: Create `specs/[feature]/us2-validation.md` documenting gate results
-
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
 
 ---
@@ -200,23 +138,6 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T027 [US3] Implement [Service] in src/services/[service].py
 - [ ] T028 [US3] Implement [endpoint/feature] in src/[location]/[file].py
 
-### User Story 3 Validation Gates *(Constitution Requirement)*
-
-**Automated Gates**:
-- [ ] All tests passing for US3 (unit, integration, contract)
-- [ ] Code coverage ≥80% for US3 code
-- [ ] Performance benchmarks met
-- [ ] Full regression suite passing (US1 + US2 + US3)
-- [ ] Security scan passed
-
-**Manual Gates**:
-- [ ] Code review approved for US3 changes
-- [ ] Manual test plan executed and documented
-- [ ] UX review approved (if user-facing)
-- [ ] All user stories integration validated
-
-**Documentation**: Create `specs/[feature]/us3-validation.md` documenting gate results
-
 **Checkpoint**: All user stories should now be independently functional
 
 ---
@@ -235,28 +156,6 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
 - [ ] TXXX Security hardening
 - [ ] TXXX Run quickstart.md validation
-
-### Final Validation Gates *(Constitution Requirement - Production Readiness)*
-
-**Automated Gates**:
-- [ ] Full regression suite passing (all tests)
-- [ ] Load tests passing (performance under load)
-- [ ] Security scan passed (production security review)
-- [ ] Code coverage ≥80% across entire feature
-- [ ] All linting/formatting checks passing
-- [ ] Production smoke tests defined and ready
-
-**Manual Gates**:
-- [ ] Full system manual test complete
-- [ ] User acceptance testing (UAT) complete and signed off
-- [ ] Final architecture/security review approved
-- [ ] Documentation complete (API docs, user docs, CHANGELOG)
-- [ ] Deployment checklist reviewed
-- [ ] Production validation plan approved
-
-**Documentation**: Create `specs/[feature]/production-validation.md` documenting gate results and production readiness sign-off
-
-**Production Ready**: Feature meets all constitution requirements and is ready for deployment
 
 ---
 

@@ -10,8 +10,8 @@ export default defineConfig({
   clearScreen: false,
 
   server: {
-    port: 5173,
-    strictPort: true,
+    port: 9000,
+    strictPort: false,
     watch: {
       // Tell vite to ignore watching `src-tauri`
       ignored: ['**/src-tauri/**'],

@@ -114,12 +114,15 @@
 - **SC-003**: [User satisfaction metric, e.g., "90% of users successfully complete primary task on first attempt"]
 - **SC-004**: [Business metric, e.g., "Reduce support tickets related to [X] by 50%"]
 
-### Performance & Quality Targets
+## Assumptions
 
-Per constitution requirements (`.specify/memory/constitution.md`):
+<!--
+  ACTION REQUIRED: The content in this section represents placeholders.
+  Fill them out with the right assumptions based on reasonable defaults
+  chosen when the feature description did not specify certain details.
+-->
 
-- **Response Times**: API reads <200ms p95, writes <500ms p95; UI feedback <100ms, transitions <1s
-- **Resource Limits**: <500MB memory per instance, <70% CPU at peak
-- **Test Coverage**: ≥80% code coverage across unit/integration/contract tests
-- **Accessibility**: WCAG 2.1 Level AA compliance
-- **Security**: OWASP Top 10 compliance, input validation at all boundaries
+- [Assumption about target users, e.g., "Users have stable internet connectivity"]
+- [Assumption about scope boundaries, e.g., "Mobile support is out of scope for v1"]
+- [Assumption about data/environment, e.g., "Existing authentication system will be reused"]
+- [Dependency on existing system/service, e.g., "Requires access to the existing user profile API"]
