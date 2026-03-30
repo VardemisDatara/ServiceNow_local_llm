@@ -124,8 +124,14 @@ export async function sendMessage(opts: SendMessageOptions): Promise<Conversatio
     }
   }
 
+  // Add current user message first (before tool results)
+  if (!userMessageAdded) {
+    ollamaMessages.push({ role: 'user', content });
+    userMessageAdded = true;
+  }
+
   // 3. MCP Tool Calling — detect intent, run tools, inject context as user/assistant
-  // pairs BEFORE the user's current message so phi3:mini sees the data as prior context
+  // pairs AFTER the user's current message so the model can reference them
   let nowAssistDegraded = false;
   if (mcpContext) {
     const { messages: toolContextMessages, nowAssistDegraded: degraded } = await executeMCPToolCalls(
@@ -183,12 +189,6 @@ export async function sendMessage(opts: SendMessageOptions): Promise<Conversatio
     } catch (err) {
       logger.warn('Web search augmentation failed', {}, err as Error);
     }
-  }
-
-  // Add current user message after any injected search context
-  if (!userMessageAdded) {
-    ollamaMessages.push({ role: 'user', content });
-    userMessageAdded = true;
   }
 
   // 4. Stream LLM response — route to cloud provider or local Ollama (T112/T118)
@@ -401,6 +401,7 @@ export function detectToolCallsFromMessage(
   //   3. Tools that need multiple required fields are skipped entirely for now.
   //   4. Single-argument string tools are triggered via keyword matching and the
   //      user's content is forwarded as the required field value.
+  //   5. Explicit tool number requests (e.g., "use tool 8") are honored directly.
   const { nowAssistConnected, nowAssistTools } = useAppStore.getState();
   logger.info('Now Assist tool detection', {
     connected: nowAssistConnected,
@@ -416,6 +417,33 @@ export function detectToolCallsFromMessage(
     if (isMetaCapabilityQuestion) {
       logger.info('Now Assist: meta-capability question detected, skipping tool detection');
     } else {
+      // Check for explicit tool number requests (e.g., "use tool 8")
+      const toolNumberMatch = content.match(/\b(use|call|invoke|run|execute|try)\s+tool\s+(\d+)\b/i);
+      if (toolNumberMatch) {
+        const toolNumber = parseInt(toolNumberMatch[2], 10);
+        const requestedTool = nowAssistTools.find((tool) => tool.id === toolNumber);
+        if (requestedTool) {
+          logger.info('Now Assist: explicit tool number request detected', { toolNumber, toolName: requestedTool.name });
+          // Add the requested tool to the calls list
+          calls.push({ name: requestedTool.name, provider: 'now_assist', arguments: { input: content } });
+        } else {
+          logger.warn('Now Assist: requested tool number not found', { toolNumber });
+        }
+      }
+      
+      // Check for explicit tool name requests (e.g., "use the incident_summarization tool")
+      const toolNameMatch = content.match(/\b(use|call|invoke|run|execute|try)\s+(the\s+)?(incident_summarization|query_incidents|get_incident_details|assess_vulnerability|analyze_threat_indicator|security_incident_recommended_actions|correlation_insights_generation|flow_generation|playbook_generation|resume_skill_extraction|docs_summarization_in_collaborative_work_management|project_gen_ai_docs|subflows_and_actions|look_up_case_records|look_up_incident_records)\s+tool\b/i);
+      if (toolNameMatch) {
+        const toolName = toolNameMatch[3];
+        const requestedTool = nowAssistTools.find((tool) => tool.name === toolName);
+        if (requestedTool) {
+          logger.info('Now Assist: explicit tool name request detected', { toolName });
+          // Add the requested tool to the calls list
+          calls.push({ name: requestedTool.name, provider: 'now_assist', arguments: { input: content } });
+        } else {
+          logger.warn('Now Assist: requested tool name not found', { toolName });
+        }
+      }
       const lowerContent = content.toLowerCase();
 
       // Words that appear broadly in tool descriptions but carry no intent signal
@@ -475,10 +503,9 @@ export function detectToolCallsFromMessage(
             if ((prefix === 'SIR' || prefix === 'INC') && !toolNameLower.includes('incident')) continue;
             if (prefix === 'CS' && !toolNameLower.includes('case')) continue;
             if (prefix === 'CHG' && !toolNameLower.includes('change')) continue;
-            // incident_summarization queries the `incident` table only — it cannot access
-            // sn_si_incident (SIR records). Our get_incident_details tool handles SIR numbers
-            // directly via REST API, so skip Now Assist for them.
-            if (tool.name === 'incident_summarization' && prefix === 'SIR') continue;
+            // Allow incident_summarization for SIR records to provide additional summarization
+            // after get_incident_details fetches the raw data via REST API.
+            // if (tool.name === 'incident_summarization' && prefix === 'SIR') continue;
             toolArgs = { number: recordNumber };
           } else if ('input' in props) {
             toolArgs = { input: content };
