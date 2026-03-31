@@ -7,13 +7,42 @@ stages:
   - test
   - sync
 
-code_quality:
+variables:
+  CACHE_KEY: ${CI_COMMIT_REF_SLUG}
+
+cache:
+  key: ${CACHE_KEY}
+  paths:
+    - node_modules/
+
+install_dependencies:
   stage: test
   image: node:20-alpine
   script:
-    - npm ci --prefer-offline
+    - npm ci --prefer-offline --no-audit
+  artifacts:
+    paths:
+      - node_modules/
+    expire_in: 1 week
+
+code_quality:
+  stage: test
+  image: node:20-alpine
+  needs: [install_dependencies]
+  script:
     - npm run lint
-  allow_failure: true
+  # Removed allow_failure to make quality gate blocking
+
+build:
+  stage: test
+  image: node:20-alpine
+  needs: [install_dependencies]
+  script:
+    - npm run build
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 week
 
 sync-wiki-to-github:
   stage: sync
@@ -21,8 +50,13 @@ sync-wiki-to-github:
   only:
     - main
   script:
-    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.wiki.git wiki
-    - cd wiki
-    - git remote add github https://${GITHUB_WIKI_TOKEN}@github.com/VardemisDatara/ServiceNow_local_llm.wiki.git
-    - git push --force github HEAD:master
+    - |
+      if git ls-remote --exit-code https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.wiki.git HEAD >/dev/null 2>&1; then
+        git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.wiki.git wiki
+        cd wiki
+        git remote add github https://${GITHUB_WIKI_TOKEN}@github.com/VardemisDatara/ServiceNow_local_llm.wiki.git
+        git push github HEAD:master || true
+      else
+        echo "Wiki repository does not exist, skipping sync"
+      fi
   allow_failure: true

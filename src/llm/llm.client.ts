@@ -4,6 +4,10 @@
  * This is a mock implementation of the LLM client for testing purposes.
  */
 
+interface MCPClient {
+  testConnection?: () => Promise<boolean>;
+}
+
 export class LLMClient {
   private initialized: boolean;
   private healthy: boolean;
@@ -37,8 +41,8 @@ export class LLMClient {
    * @param mcpClient The MCP client to test integration with.
    * @returns A promise that resolves to an object indicating the success of the integration test.
    */
-  async testMCPIntegration(mcpClient: any): Promise<{ success: boolean }> {
-    return { success: true };
+  async testMCPIntegration(mcpClient: MCPClient): Promise<{ success: boolean }> {
+    return { success: mcpClient?.testConnection?.() ?? true };
   }
 
   /**
