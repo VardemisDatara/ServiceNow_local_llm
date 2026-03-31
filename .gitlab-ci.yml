@@ -45,8 +45,9 @@ sync-wiki-to-github:
     - git init
     - git remote add github https://${GITHUB_WIKI_TOKEN}@github.com/VardemisDatara/ServiceNow_local_llm.wiki.git
     - git pull github master || true
-    - PAGES=$(curl -s -H "Authorization: Bearer 5aOHKXjrZmdAxtWK4RtajHudOOZjcEwhAXxR0yKuaVo" "https://mcp.vardemis.tech/api/v1/gitlab/projects/9/wikis" | jq -r '.data.wikis[].slug')
-    - for slug in $PAGES; do
+    - |
+      PAGES=$(curl -s -H "Authorization: Bearer 5aOHKXjrZmdAxtWK4RtajHudOOZjcEwhAXxR0yKuaVo" "https://mcp.vardemis.tech/api/v1/gitlab/projects/9/wikis" | jq -r '.data.wikis[].slug')
+      for slug in $PAGES; do
         curl -s -H "Authorization: Bearer 5aOHKXjrZmdAxtWK4RtajHudOOZjcEwhAXxR0yKuaVo" "https://mcp.vardemis.tech/api/v1/gitlab/projects/9/wikis/${slug}" | jq -r '.data.content' > "${slug}.md"
       done
     - git add .
