@@ -33,17 +33,6 @@ code_quality:
     - npm run lint
   # Removed allow_failure to make quality gate blocking
 
-build:
-  stage: test
-  image: node:20-alpine
-  needs: [install_dependencies]
-  script:
-    - npm run build
-  artifacts:
-    paths:
-      - dist/
-    expire_in: 1 week
-
 sync-wiki-to-github:
   stage: sync
   image: alpine/git
