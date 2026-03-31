@@ -39,13 +39,27 @@ sync-wiki-to-github:
   only:
     - main
   script:
-    - |
-      if git ls-remote --exit-code https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.wiki.git HEAD >/dev/null 2>&1; then
-        git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.wiki.git wiki
-        cd wiki
-        git remote add github https://${GITHUB_WIKI_TOKEN}@github.com/VardemisDatara/ServiceNow_local_llm.wiki.git
-        git push github HEAD:master || true
-      else
-        echo "Wiki repository does not exist, skipping sync"
-      fi
+    - apk add curl jq git
+    - mkdir -p wiki
+    - cd wiki
+    - git init
+    - git remote add github https://${GITHUB_WIKI_TOKEN}@github.com/VardemisDatara/ServiceNow_local_llm.wiki.git
+    - git pull github master || true
+    - 
+    # Get all wiki pages from GitLab via MCP API
+    - PAGES=$(curl -s -H "Authorization: Bearer 5aOHKXjrZmdAxtWK4RtajHudOOZjcEwhAXxR0yKuaVo" \
+      "https://mcp.vardemis.tech/api/v1/gitlab/projects/9/wikis" | jq -r '.data.wikis[].slug')
+    - 
+    # Fetch each page and save as markdown
+    - for slug in $PAGES; do
+        curl -s -H "Authorization: Bearer 5aOHKXjrZmdAxtWK4RtajHudOOZjcEwhAXxR0yKuaVo" \
+        "https://mcp.vardemis.tech/api/v1/gitlab/projects/9/wikis/${slug}" | \
+        jq -r '.data.content' > "${slug}.md"
+      done
+    - 
+    - git add .
+    - git config user.email "ci@vardemis.tech"
+    - git config user.name "CI Bot"
+    - git commit -m "Update wiki from GitLab" || true
+    - git push github master || true
   allow_failure: true
